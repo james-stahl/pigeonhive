@@ -10,7 +10,9 @@ Katterin Soto
 """
 
 
+from lib2to3.pgen2 import driver
 from queue import Empty
+from unicodedata import name
 import docker
 import argparse
 import re
@@ -32,6 +34,9 @@ used_ids = [magic_string]
 
 # used to interact with the docker engine
 client = docker.from_env()
+
+# name used for the overlay network
+overlay_network_name = 'pigeonhive_overlay'
 
 # ---------------
 
@@ -75,6 +80,18 @@ def create(args):
     input_list = args.email
     email_list = []
 
+    # check if overlay network exists and create it if not
+    networks = client.networks
+    if not networks.list(names=[overlay_network_name]):
+        print('No overlay network detected, creating now...')
+        networks.create(
+            name=overlay_network_name,
+            driver='overlay',
+            internal=True,
+            scope='swarm'
+        )
+        print(f'Created overlay network \'{overlay_network_name}\'')
+
     # check if item is an email address; if not, check if it is a file and add emails from file
     for item in input_list:
 
@@ -113,7 +130,8 @@ def create(args):
             command='sleep',
             args=['10'],
             name=id,
-            labels={'email': id_email_mapping[id]}
+            labels={'email': id_email_mapping[id]},
+            networks=[overlay_network_name]
         )
 
 
