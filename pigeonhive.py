@@ -134,15 +134,14 @@ def create(args):
         
         print(f'Creating service for {id}: {id_email_mapping[id]}')
 
-        # TODO: make this the 'real' docker container
+        # create pigeoncell service for the id/email 
         services.create(
-            image='alpine',
-            command='sleep',
-            args=['60'],
+            image=pigeoncell_container_name,
             name=id,
             labels={'email': id_email_mapping[id]},
             networks=[overlay_network_name],
-            env=[f'URL={url}']
+            env=[f'URL={url}'],
+            mounts=['/dev/shm:/dev/shm:rw']
         )
 
 
