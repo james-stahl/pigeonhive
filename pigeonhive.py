@@ -40,7 +40,8 @@ pigeoncell_container_name = 'pigeoncell'
 pigeoncell_container_path = Path('./pigeoncell_container')
 
 # default url to be used for phishing
-default_url = 'https://accounts.google.com/signin'
+default_target = 'https://accounts.google.com/signin'
+default_landing = 'localhost'
 
 # ---------------
 
@@ -62,7 +63,8 @@ def main():
     # create parser for "create" command
     create_parser = subparsers.add_parser('create', help='Create containers')
     create_parser.add_argument('email', nargs='+', action='extend', help='Email address(es) or file(s) containing a list of email address(es)')
-    create_parser.add_argument('-u', '--url', help='url to be displayed to the user (default is Google\'s signin page', default=default_url)
+    create_parser.add_argument('-t', '--target', help='target URL to be displayed by phishing page (default is Google\'s signin page', default=default_target)
+    create_parser.add_argument('-l', '--landing', help='landing page URL on which PigeonHive is hosted (defaults to localhost)', default=default_landing)
     create_parser.set_defaults(func=create)
 
     # create parser for "query" command
@@ -84,7 +86,8 @@ def main():
 def create(args):
     input_list = args.email
     email_list = []
-    url = args.url
+    target = args.target
+    landing = args.landing
 
     # check if overlay network exists and create it if not
     networks = client.networks
@@ -138,10 +141,15 @@ def create(args):
         services.create(
             image=pigeoncell_container_name,
             name=id,
-            labels={'email': id_email_mapping[id]},
             networks=[overlay_network_name],
-            env=[f'URL={url}'],
-            mounts=['/dev/shm:/dev/shm:rw']
+            env=[f'URL={target}'],
+            mounts=['/dev/shm:/dev/shm:rw'],
+            labels={
+                'email': id_email_mapping[id],  # make a label to identify services by email
+                'caddy': landing,               # this and the following labels define caddy behavior for the reverse proxy
+                'caddy.handle_path': f'/{id}',
+                'caddy.handle_path.reverse_proxy': '{{upstreams 5800}}'
+            }
         )
 
 
