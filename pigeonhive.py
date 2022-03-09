@@ -39,6 +39,9 @@ overlay_network_name = 'pigeonhive_overlay'
 pigeoncell_container_name = 'pigeoncell'
 pigeoncell_container_path = Path('./pigeoncell_container')
 
+# default url to be used for phishing
+default_url = 'https://accounts.google.com/signin'
+
 # ---------------
 
 def main():
@@ -59,7 +62,7 @@ def main():
     # create parser for "create" command
     create_parser = subparsers.add_parser('create', help='Create containers')
     create_parser.add_argument('email', nargs='+', action='extend', help='Email address(es) or file(s) containing a list of email address(es)')
-    create_parser.add_argument('-u', '--url', help='url to be displayed to the user (default is Google\'s signin page', default='https://accounts.google.com/signin')
+    create_parser.add_argument('-u', '--url', help='url to be displayed to the user (default is Google\'s signin page', default=default_url)
     create_parser.set_defaults(func=create)
 
     # create parser for "query" command
@@ -168,7 +171,7 @@ def delete(args):
     
     print(deletion_list)
 
-    if deletion_list is not Empty:
+    if deletion_list:
         [service.remove() for service in deletion_list]
         
 
