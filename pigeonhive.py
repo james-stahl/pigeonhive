@@ -10,9 +10,6 @@ Katterin Soto
 """
 
 
-from lib2to3.pgen2 import driver
-from queue import Empty
-from unicodedata import name
 import docker
 import argparse
 import re
@@ -38,6 +35,10 @@ client = docker.from_env()
 # name used for the overlay network
 overlay_network_name = 'pigeonhive_overlay'
 
+# main container information
+pigeoncell_container_name = 'pigeoncell'
+pigeoncell_container_path = Path('./pigeoncell_container')
+
 # ---------------
 
 def main():
@@ -58,6 +59,7 @@ def main():
     # create parser for "create" command
     create_parser = subparsers.add_parser('create', help='Create containers')
     create_parser.add_argument('email', nargs='+', action='extend', help='Email address(es) or file(s) containing a list of email address(es)')
+    create_parser.add_argument('-u', '--url', help='url to be displayed to the user (default is Google\'s signin page', default='https://accounts.google.com/signin')
     create_parser.set_defaults(func=create)
 
     # create parser for "query" command
@@ -79,6 +81,7 @@ def main():
 def create(args):
     input_list = args.email
     email_list = []
+    url = args.url
 
     # check if overlay network exists and create it if not
     networks = client.networks
@@ -119,6 +122,10 @@ def create(args):
     services = client.services
     pass
 
+    # build image - reference: https://docker-py.readthedocs.io/en/stable/images.html
+    print(f'Building pigeonhole image with tag \'{pigeoncell_container_name}\'...')
+    image, output = client.images.build(path=pigeoncell_container_path.as_posix(), tag=pigeoncell_container_name)
+
     # create service for each id/email
     for id in id_email_mapping:
         
@@ -128,10 +135,11 @@ def create(args):
         services.create(
             image='alpine',
             command='sleep',
-            args=['10'],
+            args=['60'],
             name=id,
             labels={'email': id_email_mapping[id]},
-            networks=[overlay_network_name]
+            networks=[overlay_network_name],
+            env=[f'URL={url}']
         )
 
 
@@ -164,7 +172,6 @@ def delete(args):
         [service.remove() for service in deletion_list]
         
 
-
 def is_valid_email(email):
 
     # returns true if email is valid (via regex)
@@ -187,8 +194,8 @@ def default_output(null):
     ascii_art = """
                             -
     \\                  /   @ )
-      \\             _/_   |~ \\)
-        \\     ( ( (     \ \\
+      \\             _/_   |~ \\)   coo
+        \\     ( ( (     \ \\          
          ( ( ( ( (       | \\
 _ _=(_(_(_(_(_(_(_  _ _ /  )
                 -  _ _ _  /
