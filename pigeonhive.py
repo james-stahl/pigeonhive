@@ -142,7 +142,6 @@ def query(args):
 
 def delete(args):
     services = client.services
-    running = services.list()
     deletion_list = []
 
     if args.all:
@@ -151,11 +150,11 @@ def delete(args):
         deletion_list.extend(services.list(filters={'name': args.id}))
     if args.email is not None:
         deletion_list.extend(services.list(filters={'label': {'email': args.email}}))
-    
-    print(deletion_list)
 
     if deletion_list:
-        [service.remove() for service in deletion_list]
+        for service in deletion_list:
+            print(f'Removing {service.name}')
+            service.remove()
 
 
 def do_networking():
