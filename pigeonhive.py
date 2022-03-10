@@ -85,38 +85,14 @@ def main():
 
 def create(args):
     input_list = args.email
-    email_list = []
     target = args.target
     landing = args.landing
 
     # check if overlay network exists and create it if not
-    networks = client.networks
-    if not networks.list(names=[overlay_network_name]):
-        print('No overlay network detected, creating now...')
-        networks.create(
-            name=overlay_network_name,
-            driver='overlay',
-            internal=True,
-            scope='swarm'
-        )
-        print(f'Created overlay network \'{overlay_network_name}\'')
+    do_networking()
 
     # check if item is an email address; if not, check if it is a file and add emails from file
-    for item in input_list:
-
-        # add email to list if valid
-        if is_valid_email(item):
-            email_list.append(item)
-
-        # for each line in file, check if line is a valid email and add if so
-        elif Path(item).is_file():
-            with Path(item).open('r') as input_file:
-                for line in input_file:
-                    candidate = line.strip()
-                    email_list.append(candidate) if is_valid_email(candidate) else print(f'{candidate} from file {item} does not appear to be an email address')
-
-        else:
-            print(f'{item} does not appear to be an email address or a file')
+    email_list = get_emails(input_list)
 
     # generate IDs (to be handled by GoPhish in the future)
     for email in email_list:
@@ -180,7 +156,41 @@ def delete(args):
 
     if deletion_list:
         [service.remove() for service in deletion_list]
+
+
+def do_networking():
+    networks = client.networks
+    if not networks.list(names=[overlay_network_name]):
+        print('No overlay network detected, creating now...')
+        networks.create(
+            name=overlay_network_name,
+            driver='overlay',
+            internal=True,
+            scope='swarm'
+        )
+        print(f'Created overlay network \'{overlay_network_name}\'')
         
+
+def get_emails(input_list):
+    email_list = []
+
+    for item in input_list:
+
+        # add email to list if valid
+        if is_valid_email(item):
+            email_list.append(item)
+
+        # for each line in file, check if line is a valid email and add if so
+        elif Path(item).is_file():
+            with Path(item).open('r') as input_file:
+                for line in input_file:
+                    candidate = line.strip()
+                    email_list.append(candidate) if is_valid_email(candidate) else print(f'{candidate} from file {item} does not appear to be an email address')
+
+        else:
+            print(f'{item} does not appear to be an email address or a file')
+
+    return email_list
 
 def is_valid_email(email):
 
