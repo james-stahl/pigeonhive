@@ -103,8 +103,6 @@ def create(args):
         # add dict record with id as key, email as value
         id_email_mapping.update({generate_id(): email})
     
-    print(email_list)
-
     # check if caddy is running and run it if not
     services = client.services
     # if caddy_container_name not in services.list(filters={'name': caddy_container_name}):
@@ -154,14 +152,14 @@ def query(args):
 
 def delete(args):
     services = client.services
-    deletion_list = []
+    deletion_list = set()
 
     if args.all:
-        deletion_list.extend(services.list(filters={'label': 'group=pigeoncell'}))
+        deletion_list.update(services.list(filters={'label': 'group=pigeoncell'}))
     if args.id is not None:
-        deletion_list.extend(services.list(filters={'name': args.id}))
+        [deletion_list.update(services.list(filters={'name': id})) for id in args.id]
     if args.email is not None:
-        deletion_list.extend(services.list(filters={'label': f'email={args.email}'}))
+        [deletion_list.update(services.list(filters={'label': f'email={email}'})) for email in args.email]
 
     if deletion_list:
         for service in deletion_list:
