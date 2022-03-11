@@ -39,6 +39,9 @@ overlay_network_name = 'pigeonhive_overlay'
 pigeoncell_container_name = 'pigeoncell'
 pigeoncell_container_path = Path('./pigeoncell_container')
 
+# caddy and gophish api container information
+caddy_container_name = 'caddy'
+
 # default url to be used for phishing
 default_target = 'https://accounts.google.com/signin'
 default_landing = 'localhost'
@@ -100,9 +103,17 @@ def create(args):
         # add dict record with id as key, email as value
         id_email_mapping.update({generate_id(): email})
     
-    # TODO: check if management node is active
+    print(email_list)
+
+    # check if caddy is running and run it if not
     services = client.services
-    pass
+    # if caddy_container_name not in services.list(filters={'name': caddy_container_name}):
+    #     services.create(
+    #         image='lucaslorentz/caddy-docker-proxy:2.4',
+    #         name=caddy_container_name,
+    #         networks=[overlay_network_name]
+    #     )
+
 
     # build image - reference: https://docker-py.readthedocs.io/en/stable/images.html
     print(f'Building pigeonhole image with tag \'{pigeoncell_container_name}\'...')
@@ -121,10 +132,11 @@ def create(args):
             env=[f'URL={target}'],
             mounts=['/dev/shm:/dev/shm:rw'],
             labels={
+                'group': 'pigeoncell',
                 'email': id_email_mapping[id],  # make a label to identify services by email
                 'caddy': landing,               # this and the following labels define caddy behavior for the reverse proxy
                 'caddy.handle_path': f'/{id}',
-                'caddy.handle_path.reverse_proxy': '{{upstreams 5800}}'
+                'caddy.handle_path.0_reverse_proxy': '{{upstreams 5800}}'
             }
         )
 
@@ -145,11 +157,11 @@ def delete(args):
     deletion_list = []
 
     if args.all:
-        deletion_list.extend(services.list())
+        deletion_list.extend(services.list(filters={'label': 'group=pigeoncell'}))
     if args.id is not None:
         deletion_list.extend(services.list(filters={'name': args.id}))
     if args.email is not None:
-        deletion_list.extend(services.list(filters={'label': {'email': args.email}}))
+        deletion_list.extend(services.list(filters={'label': f'email={args.email}'}))
 
     if deletion_list:
         for service in deletion_list:
@@ -190,6 +202,7 @@ def get_emails(input_list):
             print(f'{item} does not appear to be an email address or a file')
 
     return email_list
+
 
 def is_valid_email(email):
 
