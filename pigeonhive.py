@@ -116,10 +116,13 @@ def query(args):
         services = client.services
         running = services.list()
 
-        # iterate through services and output id and email
-        for service in running:
-            email = service.attrs['Spec']['Labels']['email']
-            print(f'{service.name}: {email}')
+        try:
+            # iterate through services and output id and email
+            for service in running:
+                email = service.attrs['Spec']['Labels']['email']
+                print(f'{service.name}: {email}')
+        except KeyError:
+            print('No services are running.')
 
 
 def delete(args):
@@ -161,9 +164,11 @@ def do_caddy():
         services.create(
             image='lucaslorentz/caddy-docker-proxy:2.4',
             name=caddy_container_name,
+            env=[f'CADDY_INGRESS_NETWORKS={overlay_network_name}'],
             networks=[overlay_network_name],
             endpoint_spec=docker.types.EndpointSpec(ports={80: 80, 443: 443}),
-            constraints=['node.labels.pigeonhive_leader == true']
+            constraints=['node.labels.pigeonhive_leader == true'],
+            mounts=['/var/run/docker.sock:/var/run/docker.sock:rw']
         )
 
 
@@ -188,9 +193,9 @@ def do_pigeoncell(target, landing):
             labels={
                 'group': 'pigeoncell',
                 'email': id_email_mapping[id],  # make a label to identify services by email
-                'caddy': landing,               # this and the following labels define caddy behavior for the reverse proxy
-                'caddy.handle_path': f'/{id}',
-                'caddy.handle_path.0_reverse_proxy': '{{upstreams 5800}}'
+                'caddy': f'{id}.{landing}',               # this and the following labels define caddy behavior for the reverse proxy
+                'caddy.reverse_proxy': '{{upstreams 5800}}',
+                'caddy.tls': 'internal'
             }
         )
 
