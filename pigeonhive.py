@@ -162,13 +162,16 @@ def do_caddy():
         print(f'Creating caddy service with name \'{caddy_container_name}\'')
         client.volumes.create(name=caddy_volume_name, driver='local')
         services.create(
-            image='lucaslorentz/caddy-docker-proxy:2.4',
+            image='lucaslorentz/caddy-docker-proxy:2.4-alpine',
             name=caddy_container_name,
             env=[f'CADDY_INGRESS_NETWORKS={overlay_network_name}'],
             networks=[overlay_network_name],
             endpoint_spec=docker.types.EndpointSpec(ports={80: 80, 443: 443}),
             constraints=['node.labels.pigeonhive_leader == true'],
-            mounts=['/var/run/docker.sock:/var/run/docker.sock:rw']
+            mounts=[
+                '/var/run/docker.sock:/var/run/docker.sock:rw',
+                f'{caddy_container_name}:/data'
+                ]
         )
 
 
@@ -192,10 +195,9 @@ def do_pigeoncell(target, landing):
             mounts=['/dev/shm:/dev/shm:rw'],
             labels={
                 'group': 'pigeoncell',
-                'email': id_email_mapping[id],  # make a label to identify services by email
-                'caddy': f'{id}.{landing}',               # this and the following labels define caddy behavior for the reverse proxy
-                'caddy.reverse_proxy': '{{upstreams 5800}}',
-                'caddy.tls': 'internal'
+                'email': id_email_mapping[id],      # make a label to identify services by email
+                'caddy': f'{id}.{landing}',         # this and the following labels define caddy behavior for the reverse proxy
+                'caddy.reverse_proxy': '{{upstreams 5800}}'
             }
         )
 
