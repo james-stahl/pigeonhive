@@ -41,10 +41,11 @@ pigeoncell_container_path = Path('./pigeoncell_container')
 
 # caddy and gophish api container information
 caddy_container_name = 'caddy'
+caddy_volume_name = 'caddy_data'
 
 # default url to be used for phishing
 default_target = 'https://accounts.google.com/signin'
-default_landing = 'localhost'
+default_landing = 'pigeonhive.local'
 
 # ---------------
 
@@ -104,39 +105,10 @@ def create(args):
         id_email_mapping.update({generate_id(): email})
     
     # check if caddy is running and run it if not
-    services = client.services
-    # if caddy_container_name not in services.list(filters={'name': caddy_container_name}):
-    #     services.create(
-    #         image='lucaslorentz/caddy-docker-proxy:2.4',
-    #         name=caddy_container_name,
-    #         networks=[overlay_network_name]
-    #     )
+    do_caddy()
 
-
-    # build image - reference: https://docker-py.readthedocs.io/en/stable/images.html
-    print(f'Building pigeonhole image with tag \'{pigeoncell_container_name}\'...')
-    image, output = client.images.build(path=pigeoncell_container_path.as_posix(), tag=pigeoncell_container_name)
-
-    # create service for each id/email
-    for id in id_email_mapping:
-        
-        print(f'Creating service for {id}: {id_email_mapping[id]}')
-
-        # create pigeoncell service for the id/email 
-        services.create(
-            image=pigeoncell_container_name,
-            name=id,
-            networks=[overlay_network_name],
-            env=[f'URL={target}'],
-            mounts=['/dev/shm:/dev/shm:rw'],
-            labels={
-                'group': 'pigeoncell',
-                'email': id_email_mapping[id],  # make a label to identify services by email
-                'caddy': landing,               # this and the following labels define caddy behavior for the reverse proxy
-                'caddy.handle_path': f'/{id}',
-                'caddy.handle_path.0_reverse_proxy': '{{upstreams 5800}}'
-            }
-        )
+    # create pigeoncell containers
+    do_pigeoncell(target, landing)
 
 
 def query(args):
@@ -179,6 +151,49 @@ def do_networking():
         )
         print(f'Created overlay network \'{overlay_network_name}\'')
         
+
+def do_caddy():
+    services = client.services
+    if not services.list(filters={'name': caddy_container_name}):
+
+        print(f'Creating caddy service with name \'{caddy_container_name}\'')
+        client.volumes.create(name=caddy_volume_name, driver='local')
+        services.create(
+            image='lucaslorentz/caddy-docker-proxy:2.4',
+            name=caddy_container_name,
+            networks=[overlay_network_name],
+            endpoint_spec=docker.types.EndpointSpec(ports={80: 80, 443: 443}),
+            constraints=['node.labels.pigeonhive_leader == true']
+        )
+
+
+def do_pigeoncell(target, landing):
+    # build pigeoncell image - reference: https://docker-py.readthedocs.io/en/stable/images.html
+    print(f'Building pigeoncell image with tag \'{pigeoncell_container_name}\'...')
+    image, output = client.images.build(path=pigeoncell_container_path.as_posix(), tag=pigeoncell_container_name)
+
+    # create service for each id/email
+    services = client.services
+    for id in id_email_mapping:
+        
+        print(f'Creating service for {id}: {id_email_mapping[id]}')
+
+        # create pigeoncell service for the id/email 
+        services.create(
+            image=pigeoncell_container_name,
+            name=id,
+            networks=[overlay_network_name],
+            env=[f'URL={target}'],
+            mounts=['/dev/shm:/dev/shm:rw'],
+            labels={
+                'group': 'pigeoncell',
+                'email': id_email_mapping[id],  # make a label to identify services by email
+                'caddy': landing,               # this and the following labels define caddy behavior for the reverse proxy
+                'caddy.handle_path': f'/{id}',
+                'caddy.handle_path.0_reverse_proxy': '{{upstreams 5800}}'
+            }
+        )
+
 
 def get_emails(input_list):
     email_list = []
