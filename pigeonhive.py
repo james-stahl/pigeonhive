@@ -40,12 +40,12 @@ pigeoncell_container_name = 'pigeoncell'
 pigeoncell_container_path = Path('./pigeoncell_container')
 
 # caddy and gophish api container information
-caddy_container_name = 'caddy'
-caddy_volume_name = 'caddy_data'
+traefik_container_name = 'traefik_proxy'
+traefik_volume_name = 'traefik_data'
 
 # default url to be used for phishing
 default_target = 'https://accounts.google.com/signin'
-default_landing = 'localhost'
+default_landing = 'test.local'
 
 # ---------------
 
@@ -105,7 +105,7 @@ def create(args):
         id_email_mapping.update({generate_id(): email})
     
     # check if caddy is running and run it if not
-    do_caddy()
+    do_traefik()
 
     # create pigeoncell containers
     do_pigeoncell(target, landing)
@@ -149,28 +149,38 @@ def do_networking():
         networks.create(
             name=overlay_network_name,
             driver='overlay',
-            internal=True,
-            scope='swarm'
         )
         print(f'Created overlay network \'{overlay_network_name}\'')
         
 
-def do_caddy():
+def do_traefik():
     services = client.services
-    if not services.list(filters={'name': caddy_container_name}):
+    if not services.list(filters={'name': traefik_container_name}):
 
-        print(f'Creating caddy service with name \'{caddy_container_name}\'')
-        client.volumes.create(name=caddy_volume_name, driver='local')
+        print(f'Creating traefik service with name \'{traefik_container_name}\'')
+        client.volumes.create(name=traefik_volume_name, driver='local')
         services.create(
-            image='lucaslorentz/caddy-docker-proxy:2.4-alpine',
-            name=caddy_container_name,
-            env=[f'CADDY_INGRESS_NETWORKS={overlay_network_name}'],
+            image='traefik:v2.7',
+            name=traefik_container_name,
+            # env=[f'CADDY_INGRESS_NETWORKS={overlay_network_name}'],
             networks=[overlay_network_name],
-            endpoint_spec=docker.types.EndpointSpec(ports={80: 80, 443: 443}),
-            constraints=['node.labels.pigeonhive_leader == true'],
+            endpoint_spec=docker.types.EndpointSpec(ports={80: 80, 443: 443, 8080:8080}),
+            constraints=[
+                'node.labels.pigeonhive_leader == true',
+                'node.role==manager'
+                ],
+            command=[
+                '--api.insecure=true',
+                '--api.dashboard',
+                '--providers.docker=true',
+                '--entryPoints.web.address=:80',
+                '--providers.docker.watch=true',
+                '--providers.docker.swarmMode=true',
+                f'--providers.docker.defaultRule=Host("{default_landing}")'
+            ],
             mounts=[
-                '/var/run/docker.sock:/var/run/docker.sock:ro',
-                f'{caddy_container_name}:/data'
+                '/var/run/docker.sock:/var/run/docker.sock'#,
+                # f'{traefik_container_name}:/data'
                 ]
         )
 
@@ -196,8 +206,8 @@ def do_pigeoncell(target, landing):
             labels={
                 'group': 'pigeoncell',
                 'email': id_email_mapping[id],      # make a label to identify services by email
-                'caddy': f'{id}.{landing}',         # this and the following labels define caddy behavior for the reverse proxy
-                'caddy.reverse_proxy': '{{upstreams 5800}}'
+                'traefik.port': '5800',             # this and the following labels define traefik behavior for the reverse proxy
+                'traefik.frontend.rule': f'Host:{default_landing}; Path: /{id}/'
             }
         )
 
