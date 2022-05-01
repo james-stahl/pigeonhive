@@ -3,7 +3,7 @@ PigeonHive - a tool to bypass MFA at scale.
 
 Echelon Risk + Cyber
 
-Authors - 
+Authors -
 James Stahl
 Steeven Rodriguez
 Katterin Soto
@@ -63,7 +63,7 @@ def main():
     parser = argparse.ArgumentParser(description='Management console for PigeonHive - bypass MFA at scale!')
     parser.set_defaults(func=default_output)
     subparsers = parser.add_subparsers(title='subcommands', help='Select a general action to take')
-    
+
     # create parser for "create" command
     create_parser = subparsers.add_parser('create', help='Create containers')
     create_parser.add_argument('email', nargs='+', action='extend', help='Email address(es) or file(s) containing a list of email address(es)')
@@ -103,7 +103,7 @@ def create(args):
 
         # add dict record with id as key, email as value
         id_email_mapping.update({generate_id(): email})
-    
+
     # check if caddy is running and run it if not
     do_traefik()
 
@@ -116,13 +116,13 @@ def query(args):
         services = client.services
         running = services.list()
 
-        try:
-            # iterate through services and output id and email
-            for service in running:
+        # iterate through services and output id and email
+        for service in running:
+            try:
                 email = service.attrs['Spec']['Labels']['email']
                 print(f'{service.name}: {email}')
-        except KeyError:
-            print('No services are running.')
+            except KeyError:
+                pass
 
 
 def delete(args):
@@ -132,9 +132,13 @@ def delete(args):
     if args.all:
         deletion_list.update(services.list(filters={'label': 'group=pigeoncell'}))
     if args.id is not None:
-        [deletion_list.update(services.list(filters={'name': id})) for id in args.id]
+        [deletion_list.update(
+            services.list(filters={'name': id})
+        ) for id in args.id]
     if args.email is not None:
-        [deletion_list.update(services.list(filters={'label': f'email={email}'})) for email in args.email]
+        [deletion_list.update(services.list(filters={
+            'label': f'email={email}'
+        })) for email in args.email]
 
     if deletion_list:
         for service in deletion_list:
@@ -151,7 +155,7 @@ def do_networking():
             driver='overlay',
         )
         print(f'Created overlay network \'{overlay_network_name}\'')
-        
+
 
 def do_traefik():
     services = client.services
@@ -160,23 +164,23 @@ def do_traefik():
         print(f'Creating traefik service with name \'{traefik_container_name}\'')
         client.volumes.create(name=traefik_volume_name, driver='local')
         services.create(
-            image='traefik:v2.7',
+            image='traefik:v1.7.34-alpine',
             name=traefik_container_name,
-            # env=[f'CADDY_INGRESS_NETWORKS={overlay_network_name}'],
             networks=[overlay_network_name],
-            endpoint_spec=docker.types.EndpointSpec(ports={80: 80, 443: 443, 8080:8080}),
+            endpoint_spec=docker.types.EndpointSpec(
+                ports={80: 80, 443: 443, 8080:8080}
+            ),
             constraints=[
                 'node.labels.pigeonhive_leader == true',
                 'node.role==manager'
                 ],
-            command=[
-                '--api.insecure=true',
-                '--api.dashboard',
-                '--providers.docker=true',
-                '--entryPoints.web.address=:80',
-                '--providers.docker.watch=true',
-                '--providers.docker.swarmMode=true',
-                f'--providers.docker.defaultRule=Host("{default_landing}")'
+            args=[
+                '--docker',
+                '--docker.swarmmode',
+                f'--docker.domain={default_landing}',
+                '--docker.watch',
+                '--logLevel=DEBUG',
+                '--web'
             ],
             mounts=[
                 '/var/run/docker.sock:/var/run/docker.sock'#,
@@ -193,10 +197,10 @@ def do_pigeoncell(target, landing):
     # create service for each id/email
     services = client.services
     for id in id_email_mapping:
-        
+
         print(f'Creating service for {id}: {id_email_mapping[id]}')
 
-        # create pigeoncell service for the id/email 
+        # create pigeoncell service for the id/email
         services.create(
             image=pigeoncell_container_name,
             name=id,
@@ -206,8 +210,7 @@ def do_pigeoncell(target, landing):
             labels={
                 'group': 'pigeoncell',
                 'email': id_email_mapping[id],      # make a label to identify services by email
-                'traefik.port': '5800',             # this and the following labels define traefik behavior for the reverse proxy
-                'traefik.frontend.rule': f'Host:{default_landing}; Path: /{id}/'
+                'traefik.port': '5800'              # this and the following labels define traefik behavior for the reverse proxy
             }
         )
 
@@ -245,7 +248,7 @@ def generate_id():
     # generate IDs until a unique one is found (likely on first try)
     candidate = magic_string
     while candidate in used_ids:
-        candidate = get_random_string(8)
+        candidate = get_random_string(8).lower()
 
     return candidate
 
@@ -257,7 +260,7 @@ def default_output(null):
                             -
     \\                  /   @ )
       \\             _/_   |~ \\)   coo
-        \\     ( ( (     \ \\          
+        \\     ( ( (     \ \\
          ( ( ( ( (       | \\
 _ _=(_(_(_(_(_(_(_  _ _ /  )
                 -  _ _ _  /
