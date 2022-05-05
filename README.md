@@ -24,6 +24,10 @@ PigeonHive takes this technique and makes it operational in a few ways.
 3. Allows for accessing each machine through subdomains
 4. Enables interaction tracking (currently in the "GoPhish Addon" branch)
 
+## The Name
+
+The name PigeonHive was chosen because this method essentially creates pigeonholes for the targeted users. "Hive" seemed appropriate for a group of these managed by a swarm.
+
 # Usage
 
 ## Setup
@@ -48,6 +52,8 @@ PigeonHive features three subcommands: **create**, **query**, and **delete**.
 
 ### Subcommands
 
+Note: please refer to the program's *help* output for more detailed instructions on how to use the subcommands.
+
 #### create
 
 Creates pigeoncell containers and exposes them to the reverse proxy.
@@ -58,8 +64,4 @@ Allows you to list active pigeoncell containers and see their email mappings.
 
 #### delete
 
-Removes active containers
-
-# The Name
-
-The name PigeonHive was chosen because this method essentially creates pigeonholes for the targeted users. "Hive" seemed appropriate for a group of these managed by a swarm.
+Removes active containers.
